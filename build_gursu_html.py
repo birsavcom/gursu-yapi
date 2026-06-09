@@ -16,7 +16,9 @@ ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
 DEBUG = RESULTS / "debug"
 OUT_PATH = ROOT / "index.html"
-CACHE_TOKEN = "20260608a"
+DATA = ROOT / "data"
+IMARSIZ_GEOJSON = DATA / "imarsiz-gursu.geojson"
+CACHE_TOKEN = "20260608b"
 
 BOUNDS = {
     "west": 29.131191,
@@ -37,11 +39,110 @@ def _read_csv_rows(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _walk_coordinate_pairs(value):
+    if isinstance(value, list) and len(value) >= 2 and all(isinstance(v, (int, float)) for v in value[:2]):
+        yield float(value[0]), float(value[1])
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_coordinate_pairs(item)
+
+
+def _geometry_bbox(geometry: dict) -> tuple[float, float, float, float] | None:
+    points = list(_walk_coordinate_pairs((geometry or {}).get("coordinates")))
+    if not points:
+        return None
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _point_in_ring(lon: float, lat: float, ring: list) -> bool:
+    inside = False
+    if len(ring) < 3:
+        return False
+    j = len(ring) - 1
+    for i, current in enumerate(ring):
+        previous = ring[j]
+        xi, yi = float(current[0]), float(current[1])
+        xj, yj = float(previous[0]), float(previous[1])
+        if (yi > lat) != (yj > lat):
+            x_intersect = (xj - xi) * (lat - yi) / (yj - yi) + xi
+            if lon < x_intersect:
+                inside = not inside
+        j = i
+    return inside
+
+
+def _point_in_polygon(lon: float, lat: float, polygon: list) -> bool:
+    if not polygon or not _point_in_ring(lon, lat, polygon[0]):
+        return False
+    return not any(_point_in_ring(lon, lat, hole) for hole in polygon[1:])
+
+
+def _point_in_geometry(lon: float, lat: float, geometry: dict) -> bool:
+    geom_type = (geometry or {}).get("type")
+    coordinates = (geometry or {}).get("coordinates") or []
+    if geom_type == "Polygon":
+        return _point_in_polygon(lon, lat, coordinates)
+    if geom_type == "MultiPolygon":
+        return any(_point_in_polygon(lon, lat, polygon) for polygon in coordinates)
+    return False
+
+
+def load_imarsiz_index() -> list[tuple[tuple[float, float, float, float], dict]]:
+    if not IMARSIZ_GEOJSON.exists():
+        return []
+    data = json.loads(IMARSIZ_GEOJSON.read_text(encoding="utf-8-sig"))
+    indexed = []
+    for feature in data.get("features", []):
+        geometry = feature.get("geometry") or {}
+        bbox = _geometry_bbox(geometry)
+        if bbox:
+            indexed.append((bbox, geometry))
+    return indexed
+
+
+def is_in_imarsiz_area(lon: float, lat: float, imarsiz_index: list) -> bool:
+    for (west, south, east, north), geometry in imarsiz_index:
+        if west <= lon <= east and south <= lat <= north and _point_in_geometry(lon, lat, geometry):
+            return True
+    return False
+
+
+def detection_classification(lon: float, lat: float, run: dict, imarsiz_index: list) -> dict:
+    if is_in_imarsiz_area(lon, lat, imarsiz_index):
+        return {
+            "category": "kacak_yapi",
+            "title": "Ka?ak Yap?",
+            "status": "Ka?ak yap? aday?",
+            "description": (
+                f"?mars?z alanda, {run['year_from']} y?l?nda g?r?nmeyip "
+                f"{run['year_to']} y?l?nda g?r?nen yap? aday?"
+            ),
+            "imar_status": "?mars?z alan",
+            "accent_color": "#ff2d2d",
+            "accent_text_color": "#ffffff",
+        }
+    return {
+        "category": "yapi_farki",
+        "title": "Yap? Fark?",
+        "status": "Yap? fark?",
+        "description": (
+            f"?marl? alanda, {run['year_from']} y?l?nda g?r?nmeyip "
+            f"{run['year_to']} y?l?nda g?r?nen yap? fark?"
+        ),
+        "imar_status": "?marl? alan",
+        "accent_color": "#f4c430",
+        "accent_text_color": "#111111",
+    }
+
+
 def read_detections_for_run(run: dict) -> list[dict]:
     key = run["key"]
     csv_path = DEBUG / f"gursu_change_verified_segmentation_points_{key}.csv"
     verified_dir = RESULTS / f"masks_segmentation_verified_{key}"
     rows = _read_csv_rows(csv_path)
+    imarsiz_index = load_imarsiz_index()
 
     detections = []
     seen_detections = set()
@@ -62,6 +163,7 @@ def read_detections_for_run(run: dict) -> list[dict]:
         if dedupe_key in seen_detections:
             continue
         seen_detections.add(dedupe_key)
+        classification = detection_classification(lon, lat, run, imarsiz_index)
         detections.append(
             {
                 "detection_id": f"GUR_{key}_{index:06d}",
@@ -71,15 +173,10 @@ def read_detections_for_run(run: dict) -> list[dict]:
                 "merged_triplet_rel": (
                     f"results/masks_segmentation_verified_{key}/pair_{pair_id}.jpg?v={CACHE_TOKEN}"
                 ),
-                "status": "Tespit Edildi",
-                "title": "Tespit",
-                "description": (
-                    f"{run['year_from']} yilinda gorunmeyip "
-                    f"{run['year_to']} yilinda gorunen yapi adayi"
-                ),
-                "date_label": f"{run['year_from']}-{run['year_to']} Kiyaslamasi",
+                "date_label": f"{run['year_from']}-{run['year_to']} K?yaslamas?",
                 "year_from": run["year_from"],
                 "year_to": run["year_to"],
+                **classification,
             }
         )
     return detections
@@ -99,7 +196,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gursu Yeni Bina Tespit Haritasi</title>
+  <title>G?rsu Yap? Tespit Haritas?</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     html, body {{ height: 100%; margin: 0; font-family: Arial, sans-serif; background: #101418; color: #fff; }}
@@ -126,6 +223,11 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     .popup-label {{ color: #c8d0d7; font-weight: 600; min-width: 96px; }}
     .popup-value {{ color: #ffffff; text-align: right; flex: 1; }}
     .popup-btn {{ margin-top: 14px; width: 100%; border: 0; border-radius: 8px; background: #f03232; color: #fff; font-weight: 700; padding: 12px 14px; font-size: 15px; cursor: default; }}
+    .legend {{ display: flex; align-items: center; gap: 10px; margin-top: 9px; color: #d6dee6; font-size: 12px; }}
+    .legend-item {{ display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }}
+    .legend-dot {{ width: 10px; height: 10px; border-radius: 999px; display: inline-block; border: 1px solid #2b2f34; }}
+    .legend-dot.red {{ background: #ff2d2d; }}
+    .legend-dot.yellow {{ background: #f4c430; }}
     .map-panel {{ position: fixed; z-index: 999; top: 14px; left: 14px; background: rgba(10,20,30,0.90); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); min-width: 278px; }}
     .panel-title {{ font-weight: 700; margin-bottom: 8px; }}
     .controls {{ display: flex; align-items: center; gap: 8px; }}
@@ -136,13 +238,14 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 </head>
 <body>
   <div class="map-panel">
-    <div class="panel-title">Gursu Haritasi - Yeni Bina Adaylari</div>
+    <div class="panel-title">G?rsu Haritas? - Yap? Tespitleri</div>
     <div class="controls">
       <label for="fromYear">Baslangic</label>
       <select class="year-select" id="fromYear"></select>
       <label for="toYear">Bitis</label>
       <select class="year-select" id="toYear"></select>
     </div>
+    <div class="legend"><span class="legend-item"><span class="legend-dot red"></span>Ka?ak Yap?</span><span class="legend-item"><span class="legend-dot yellow"></span>Yap? Fark?</span></div>
   </div>
   <div id="map"></div>
   <div id="cpopup"></div>
@@ -158,9 +261,16 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     const defaultBounds = L.latLngBounds([boundsInfo.south, boundsInfo.west], [boundsInfo.north, boundsInfo.east]);
     map.fitBounds(defaultBounds);
     map.setMaxBounds(defaultBounds.pad(0.08));
-    const markerDefaultStyle = {{ radius: 6, fillColor: '#ff2d2d', color: '#2b2f34', weight: 1, opacity: 1, fillOpacity: 0.95 }};
-    const markerHoverStyle = {{ radius: 6, fillColor: '#4fc3f7', color: '#2b2f34', weight: 1, opacity: 1, fillOpacity: 0.95 }};
-    const markerSelectedStyle = {{ radius: 9, fillColor: '#4caf50', color: '#2b2f34', weight: 1, opacity: 1, fillOpacity: 0.95 }};
+    const markerPalette = {{
+      kacak_yapi: {{ fill: '#ff2d2d', stroke: '#2b2f34' }},
+      yapi_farki: {{ fill: '#f4c430', stroke: '#6c5400' }}
+    }};
+    function markerStyle(item, state) {{
+      const palette = markerPalette[item.category] || markerPalette.kacak_yapi;
+      if (state === 'hover') return {{ radius: 6, fillColor: '#4fc3f7', color: palette.stroke, weight: 1, opacity: 1, fillOpacity: 0.95 }};
+      if (state === 'selected') return {{ radius: 9, fillColor: '#4caf50', color: palette.stroke, weight: 1, opacity: 1, fillOpacity: 0.95 }};
+      return {{ radius: 6, fillColor: palette.fill, color: palette.stroke, weight: 1, opacity: 1, fillOpacity: 0.95 }};
+    }}
     let selectedMarker = null;
     let markerLayer = L.layerGroup().addTo(map);
     const cpopup = document.getElementById('cpopup');
@@ -189,11 +299,12 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
         + '<div class="popup-body">'
         + '<div class="popup-title">' + item.title + '</div>'
         + '<div class="popup-row"><div class="popup-label">Nokta ID:</div><div class="popup-value">' + item.detection_id + '</div></div>'
-        + '<div class="popup-row"><div class="popup-label">Donem:</div><div class="popup-value">' + item.date_label + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">D?nem:</div><div class="popup-value">' + item.date_label + '</div></div>'
         + '<div class="popup-row"><div class="popup-label">Durum:</div><div class="popup-value">' + item.status + '</div></div>'
-        + '<div class="popup-row"><div class="popup-label">Aciklama:</div><div class="popup-value">' + item.description + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">?mar:</div><div class="popup-value">' + item.imar_status + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">A??klama:</div><div class="popup-value">' + item.description + '</div></div>'
         + '<div class="popup-row"><div class="popup-label">Koordinatlar:</div><div class="popup-value">' + item.lat.toFixed(6) + ', ' + item.lon.toFixed(6) + '</div></div>'
-        + '<button class="popup-btn" type="button">Detay</button>'
+        + '<button class="popup-btn" type="button" style="background:' + item.accent_color + '; color:' + item.accent_text_color + ';">Detay</button>'
         + '</div></div></div></div></div>';
     }}
 
@@ -224,7 +335,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
       cpopup.classList.remove('visible');
       cpopup.innerHTML = '';
       if (selectedMarker) {{
-        selectedMarker.setStyle(markerDefaultStyle);
+        selectedMarker.setStyle(markerStyle(selectedMarker._item, 'default'));
         selectedMarker = null;
       }}
     }};
@@ -245,15 +356,15 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
         const dedupeKey = item.lat.toFixed(6) + '_' + item.lon.toFixed(6) + '_' + item.date_label;
         if (seen.has(dedupeKey)) return;
         seen.add(dedupeKey);
-        const marker = L.circleMarker([item.lat, item.lon], markerDefaultStyle);
+        const marker = L.circleMarker([item.lat, item.lon], markerStyle(item, 'default'));
         marker._item = item;
-        marker.on('mouseover', function() {{ if (this !== selectedMarker) this.setStyle(markerHoverStyle); }});
-        marker.on('mouseout', function() {{ if (this !== selectedMarker) this.setStyle(markerDefaultStyle); }});
+        marker.on('mouseover', function() {{ if (this !== selectedMarker) this.setStyle(markerStyle(this._item, 'hover')); }});
+        marker.on('mouseout', function() {{ if (this !== selectedMarker) this.setStyle(markerStyle(this._item, 'default')); }});
         marker.on('click', function(e) {{
           L.DomEvent.stopPropagation(e);
-          if (selectedMarker && selectedMarker !== this) selectedMarker.setStyle(markerDefaultStyle);
+          if (selectedMarker && selectedMarker !== this) selectedMarker.setStyle(markerStyle(selectedMarker._item, 'default'));
           selectedMarker = this;
-          this.setStyle(markerSelectedStyle);
+          this.setStyle(markerStyle(this._item, 'selected'));
           showPopup(this._item, this.getLatLng());
         }});
         markerLayer.addLayer(marker);
@@ -283,7 +394,16 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 def main() -> None:
     year_datasets = build_year_datasets()
     OUT_PATH.write_text(build_html(year_datasets), encoding="utf-8")
-    summary = {key: len(value) for key, value in year_datasets.items()}
+    summary = {
+        key: {
+            "total": len(value),
+            "by_category": {
+                category: sum(1 for item in value if item.get("category") == category)
+                for category in sorted({item.get("category") for item in value})
+            },
+        }
+        for key, value in year_datasets.items()
+    }
     print(json.dumps({"output": str(OUT_PATH), "detections": summary}, ensure_ascii=False, indent=2))
 
 

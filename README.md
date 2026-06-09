@@ -25,3 +25,12 @@ Gursu ilcesi icin Esri World Imagery Wayback kaynakli 512x512 uydu goruntusu ind
 - dataset/: Ham uydu goruntuleri buyuk oldugu icin repoya eklenmez
 - models/*.pt: Model dosyalari GitHub 100 MB sinirini astigi icin repoya eklenmez
 - logs/: Calisma loglari yereldedir
+
+## Imar Siniflandirmasi
+
+Haritadaki tespit noktalarinin siniflandirilmasi `data/imarsiz-gursu.geojson` kaynagina gore yapilir.
+
+- Kacak Yapi: Tespit noktasi imarsiz/plansiz alan poligonu icindedir ve haritada kirmizi nokta ile gosterilir.
+- Yapi Farki: Tespit noktasi imarsiz alan disindadir ve haritada sari nokta ile gosterilir.
+
+`maks-ruhsat.json` ruhsat kayitlarini MAKS `kimlik_no` ile tutar; bu dosyanin dogrudan koordinati yoktur. Ruhsat-kimlik bazli kesin eslestirme icin MAKS yapi geometrisi veya yetkili CBS API erisimi gerekir.

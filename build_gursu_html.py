@@ -1,4 +1,4 @@
-﻿"""
+"""
 Build the Gursu change-detection review map.
 
 The generated index.html is self-contained apart from Leaflet CDN assets and the
@@ -113,25 +113,25 @@ def detection_classification(lon: float, lat: float, run: dict, imarsiz_index: l
     if is_in_imarsiz_area(lon, lat, imarsiz_index):
         return {
             "category": "kacak_yapi",
-            "title": "Ka?ak Yap?",
-            "status": "Ka?ak yap? aday?",
+            "title": "Ka\u00e7ak Yap\u0131",
+            "status": "Ka\u00e7ak yap\u0131 aday\u0131",
             "description": (
-                f"?mars?z alanda, {run['year_from']} y?l?nda g?r?nmeyip "
-                f"{run['year_to']} y?l?nda g?r?nen yap? aday?"
+                f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
+                f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen ka\u00e7ak yap\u0131 aday\u0131"
             ),
-            "imar_status": "?mars?z alan",
+            "imar_status": "\u0130mars\u0131z alan",
             "accent_color": "#ff2d2d",
             "accent_text_color": "#ffffff",
         }
     return {
         "category": "yapi_farki",
-        "title": "Yap? Fark?",
-        "status": "Yap? fark?",
+        "title": "Yap\u0131 Fark\u0131",
+        "status": "Yap\u0131 fark\u0131",
         "description": (
-            f"?marl? alanda, {run['year_from']} y?l?nda g?r?nmeyip "
-            f"{run['year_to']} y?l?nda g?r?nen yap? fark?"
+            f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
+            f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen fark yap\u0131"
         ),
-        "imar_status": "?marl? alan",
+        "imar_status": "\u0130marl\u0131 alan",
         "accent_color": "#f4c430",
         "accent_text_color": "#111111",
     }
@@ -173,7 +173,7 @@ def read_detections_for_run(run: dict) -> list[dict]:
                 "merged_triplet_rel": (
                     f"results/masks_segmentation_verified_{key}/pair_{pair_id}.jpg?v={CACHE_TOKEN}"
                 ),
-                "date_label": f"{run['year_from']}-{run['year_to']} K?yaslamas?",
+                "date_label": f"{run['year_from']}-{run['year_to']} K\u0131yaslamas\u0131",
                 "year_from": run["year_from"],
                 "year_to": run["year_to"],
                 **classification,
@@ -196,7 +196,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>G?rsu Yap? Tespit Haritas?</title>
+  <title>G\u00fcrsu Yap\u0131 Tespit Haritas\u0131</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     html, body {{ height: 100%; margin: 0; font-family: Arial, sans-serif; background: #101418; color: #fff; }}
@@ -238,14 +238,14 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 </head>
 <body>
   <div class="map-panel">
-    <div class="panel-title">G?rsu Haritas? - Yap? Tespitleri</div>
+    <div class="panel-title">G\u00fcrsu Haritas\u0131 - Yap\u0131 Tespitleri</div>
     <div class="controls">
-      <label for="fromYear">Baslangic</label>
+      <label for="fromYear">Ba\u015flang\u0131\u00e7</label>
       <select class="year-select" id="fromYear"></select>
-      <label for="toYear">Bitis</label>
+      <label for="toYear">Biti\u015f</label>
       <select class="year-select" id="toYear"></select>
     </div>
-    <div class="legend"><span class="legend-item"><span class="legend-dot red"></span>Ka?ak Yap?</span><span class="legend-item"><span class="legend-dot yellow"></span>Yap? Fark?</span></div>
+    <div class="legend"><span class="legend-item"><span class="legend-dot red"></span>Ka\u00e7ak Yap\u0131</span><span class="legend-item"><span class="legend-dot yellow"></span>Yap\u0131 Fark\u0131</span></div>
   </div>
   <div id="map"></div>
   <div id="cpopup"></div>
@@ -299,10 +299,10 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
         + '<div class="popup-body">'
         + '<div class="popup-title">' + item.title + '</div>'
         + '<div class="popup-row"><div class="popup-label">Nokta ID:</div><div class="popup-value">' + item.detection_id + '</div></div>'
-        + '<div class="popup-row"><div class="popup-label">D?nem:</div><div class="popup-value">' + item.date_label + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">D\u00f6nem:</div><div class="popup-value">' + item.date_label + '</div></div>'
         + '<div class="popup-row"><div class="popup-label">Durum:</div><div class="popup-value">' + item.status + '</div></div>'
-        + '<div class="popup-row"><div class="popup-label">?mar:</div><div class="popup-value">' + item.imar_status + '</div></div>'
-        + '<div class="popup-row"><div class="popup-label">A??klama:</div><div class="popup-value">' + item.description + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">\u0130mar:</div><div class="popup-value">' + item.imar_status + '</div></div>'
+        + '<div class="popup-row"><div class="popup-label">A\u00e7\u0131klama:</div><div class="popup-value">' + item.description + '</div></div>'
         + '<div class="popup-row"><div class="popup-label">Koordinatlar:</div><div class="popup-value">' + item.lat.toFixed(6) + ', ' + item.lon.toFixed(6) + '</div></div>'
         + '<button class="popup-btn" type="button" style="background:' + item.accent_color + '; color:' + item.accent_text_color + ';">Detay</button>'
         + '</div></div></div></div></div>';

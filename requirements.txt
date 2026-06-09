@@ -1,0 +1,10 @@
+﻿requests
+Pillow
+opencv-python
+numpy
+tqdm
+shapely
+ultralytics
+torch
+transformers
+

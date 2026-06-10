@@ -230,17 +230,17 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
   <style>
     html, body {{ height: 100%; margin: 0; font-family: Arial, sans-serif; background: #101418; color: #fff; }}
     #map {{ width: 100%; height: 100%; }}
-    #cpopup {{ display: none; position: fixed; z-index: 1100; background: transparent; color: #fff; border-radius: 10px; box-shadow: 0 3px 14px rgba(0,0,0,.4); padding: 0; }}
+    #cpopup {{ display: none; position: fixed; z-index: 1100; background: transparent; color: #fff; border-radius: 10px; box-shadow: 0 3px 14px rgba(0,0,0,.4); padding: 0; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; }}
     #cpopup.visible {{ display: block; }}
     .cpopup-close {{ position: absolute; top: 0; right: 0; border: none; width: 24px; height: 24px; font: 16px/24px Tahoma, Verdana, sans-serif; color: #aeb6bd; background: transparent; cursor: pointer; z-index: 10; }}
     .cpopup-close:hover {{ color: #ff5454; }}
     .cpopup-content {{ margin: 0; }}
-    .popup-wrap {{ width: 500px; max-width: 82vw; }}
+    .popup-wrap {{ width: min(500px, calc(100vw - 24px)); }}
     .popup-head {{ display: grid; grid-template-columns: repeat(3, 1fr); background: #ffffff; color: #111111; border-radius: 8px 8px 0 0; overflow: hidden; font-weight: 700; text-align: center; }}
     .popup-head div {{ padding: 8px 6px; border-right: 1px solid #d8dde3; }}
     .popup-head div:last-child {{ border-right: 0; }}
-    .triplet-frame {{ position: relative; margin-bottom: 12px; border: 1px solid #333; border-radius: 0 0 8px 8px; overflow: hidden; background: #000; }}
-    .popup-image {{ display: block; width: 100%; }}
+    .triplet-frame {{ position: relative; aspect-ratio: 3 / 1; margin-bottom: 12px; border: 1px solid #333; border-radius: 0 0 8px 8px; overflow: hidden; background: #000; }}
+    .popup-image {{ display: block; width: 100%; height: 100%; object-fit: cover; }}
     .triplet-sep {{ position: absolute; top: 0; bottom: 0; width: 2px; background: #000; pointer-events: none; z-index: 2; }}
     .triplet-sep.sep1 {{ left: 33.3333%; transform: translateX(-1px); }}
     .triplet-sep.sep2 {{ left: 66.6666%; transform: translateX(-1px); }}
@@ -339,28 +339,56 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
         + '</div></div></div></div></div>';
     }}
 
+    function clamp(value, min, max) {{
+      return Math.max(min, Math.min(value, max));
+    }}
+
+    function positionPopup(markerLatLng) {{
+      const pt = map.latLngToContainerPoint(markerLatLng);
+      const mapRect = map.getContainer().getBoundingClientRect();
+      const markerX = mapRect.left + pt.x;
+      const markerY = mapRect.top + pt.y;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const gap = 14;
+      const margin = 12;
+      const pw = Math.min(cpopup.offsetWidth, vw - margin * 2);
+      const ph = Math.min(cpopup.offsetHeight, vh - margin * 2);
+      const spaceLeft = markerX - margin - gap;
+      const spaceRight = vw - markerX - margin - gap;
+      const spaceAbove = markerY - margin - gap;
+      const spaceBelow = vh - markerY - margin - gap;
+      let left = markerX > vw / 2 ? markerX - pw - gap : markerX + gap;
+      let top = markerY > vh / 2 ? markerY - ph - gap : markerY + gap;
+
+      if (left < margin && spaceRight >= pw) left = markerX + gap;
+      if (left + pw > vw - margin && spaceLeft >= pw) left = markerX - pw - gap;
+      if (top < margin && spaceBelow >= ph) top = markerY + gap;
+      if (top + ph > vh - margin && spaceAbove >= ph) top = markerY - ph - gap;
+
+      cpopup.style.left = clamp(left, margin, vw - pw - margin) + 'px';
+      cpopup.style.top = clamp(top, margin, vh - ph - margin) + 'px';
+    }}
+
     function showPopup(item, markerLatLng) {{
       cpopup.innerHTML = makePopupHTML(item);
+      cpopup.style.left = '-9999px';
+      cpopup.style.top = '-9999px';
       cpopup.classList.add('visible');
       requestAnimationFrame(function() {{
-        const pw = cpopup.offsetWidth;
-        const ph = cpopup.offsetHeight;
-        const pt = map.latLngToContainerPoint(markerLatLng);
-        const mapRect = map.getContainer().getBoundingClientRect();
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const gap = 12;
-        const margin = 10;
-        const goLeft = (mapRect.left + pt.x) > vw / 2;
-        const goUp = (mapRect.top + pt.y) > vh / 2;
-        let left = mapRect.left + (goLeft ? pt.x - pw - gap : pt.x + gap);
-        let top = mapRect.top + (goUp ? pt.y - ph - gap : pt.y + gap);
-        left = Math.max(margin, Math.min(left, vw - pw - margin));
-        top = Math.max(margin, Math.min(top, vh - ph - margin));
-        cpopup.style.left = left + 'px';
-        cpopup.style.top = top + 'px';
+        positionPopup(markerLatLng);
+        const image = cpopup.querySelector('.popup-image');
+        if (image && !image.complete) {{
+          image.addEventListener('load', function() {{ positionPopup(markerLatLng); }}, {{ once: true }});
+        }}
       }});
     }}
+    window.addEventListener('resize', function() {{
+      if (cpopup.classList.contains('visible') && selectedMarker) positionPopup(selectedMarker.getLatLng());
+    }});
+    map.on('zoom move', function() {{
+      if (cpopup.classList.contains('visible') && selectedMarker) positionPopup(selectedMarker.getLatLng());
+    }});
 
     window.hidePopup = function() {{
       cpopup.classList.remove('visible');

@@ -18,7 +18,8 @@ DEBUG = RESULTS / "debug"
 OUT_PATH = ROOT / "index.html"
 DATA = ROOT / "data"
 IMARSIZ_GEOJSON = DATA / "imarsiz-gursu.geojson"
-CACHE_TOKEN = "20260608b"
+RUHSATLI_GEOJSON = DATA / "ruhsatli-yapi-parseller-gursu.geojson"
+CACHE_TOKEN = "20260608c"
 
 BOUNDS = {
     "west": 29.131191,
@@ -89,10 +90,10 @@ def _point_in_geometry(lon: float, lat: float, geometry: dict) -> bool:
     return False
 
 
-def load_imarsiz_index() -> list[tuple[tuple[float, float, float, float], dict]]:
-    if not IMARSIZ_GEOJSON.exists():
+def load_geojson_index(path: Path) -> list[tuple[tuple[float, float, float, float], dict]]:
+    if not path.exists():
         return []
-    data = json.loads(IMARSIZ_GEOJSON.read_text(encoding="utf-8-sig"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     indexed = []
     for feature in data.get("features", []):
         geometry = feature.get("geometry") or {}
@@ -102,15 +103,42 @@ def load_imarsiz_index() -> list[tuple[tuple[float, float, float, float], dict]]
     return indexed
 
 
-def is_in_imarsiz_area(lon: float, lat: float, imarsiz_index: list) -> bool:
-    for (west, south, east, north), geometry in imarsiz_index:
+def load_imarsiz_index() -> list[tuple[tuple[float, float, float, float], dict]]:
+    return load_geojson_index(IMARSIZ_GEOJSON)
+
+
+def load_ruhsatli_index() -> list[tuple[tuple[float, float, float, float], dict]]:
+    return load_geojson_index(RUHSATLI_GEOJSON)
+
+
+def is_in_polygon_index(lon: float, lat: float, polygon_index: list) -> bool:
+    for (west, south, east, north), geometry in polygon_index:
         if west <= lon <= east and south <= lat <= north and _point_in_geometry(lon, lat, geometry):
             return True
     return False
 
 
-def detection_classification(lon: float, lat: float, run: dict, imarsiz_index: list) -> dict:
-    if is_in_imarsiz_area(lon, lat, imarsiz_index):
+def detection_classification(
+    lon: float,
+    lat: float,
+    run: dict,
+    imarsiz_index: list,
+    ruhsatli_index: list,
+) -> dict:
+    if is_in_polygon_index(lon, lat, ruhsatli_index):
+        return {
+            "category": "yapi_ruhsatli",
+            "title": "Yap\u0131 Ruhsatl\u0131",
+            "status": "Yap\u0131 ruhsatl\u0131",
+            "description": (
+                f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
+                f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen yap\u0131 ruhsatl\u0131 yap\u0131"
+            ),
+            "imar_status": "Yap\u0131 ruhsatl\u0131",
+            "accent_color": "#8b5a2b",
+            "accent_text_color": "#ffffff",
+        }
+    if is_in_polygon_index(lon, lat, imarsiz_index):
         return {
             "category": "kacak_yapi",
             "title": "Ka\u00e7ak Yap\u0131",
@@ -125,8 +153,8 @@ def detection_classification(lon: float, lat: float, run: dict, imarsiz_index: l
         }
     return {
         "category": "yapi_farki",
-        "title": "Yap\u0131 Fark\u0131",
-        "status": "Yap\u0131 fark\u0131",
+        "title": "\u0130marl\u0131",
+        "status": "\u0130marl\u0131 yap\u0131 fark\u0131",
         "description": (
             f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
             f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen fark yap\u0131"
@@ -143,6 +171,7 @@ def read_detections_for_run(run: dict) -> list[dict]:
     verified_dir = RESULTS / f"masks_segmentation_verified_{key}"
     rows = _read_csv_rows(csv_path)
     imarsiz_index = load_imarsiz_index()
+    ruhsatli_index = load_ruhsatli_index()
 
     detections = []
     seen_detections = set()
@@ -163,7 +192,7 @@ def read_detections_for_run(run: dict) -> list[dict]:
         if dedupe_key in seen_detections:
             continue
         seen_detections.add(dedupe_key)
-        classification = detection_classification(lon, lat, run, imarsiz_index)
+        classification = detection_classification(lon, lat, run, imarsiz_index, ruhsatli_index)
         detections.append(
             {
                 "detection_id": f"GUR_{key}_{index:06d}",
@@ -228,6 +257,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     .legend-dot {{ width: 10px; height: 10px; border-radius: 999px; display: inline-block; border: 1px solid #2b2f34; }}
     .legend-dot.red {{ background: #ff2d2d; }}
     .legend-dot.yellow {{ background: #f4c430; }}
+    .legend-dot.brown {{ background: #8b5a2b; }}
     .map-panel {{ position: fixed; z-index: 999; top: 14px; left: 14px; background: rgba(10,20,30,0.90); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); min-width: 278px; }}
     .panel-title {{ font-weight: 700; margin-bottom: 8px; }}
     .controls {{ display: flex; align-items: center; gap: 8px; }}
@@ -245,7 +275,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
       <label for="toYear">Biti\u015f</label>
       <select class="year-select" id="toYear"></select>
     </div>
-    <div class="legend"><span class="legend-item"><span class="legend-dot red"></span>Ka\u00e7ak Yap\u0131</span><span class="legend-item"><span class="legend-dot yellow"></span>Yap\u0131 Fark\u0131</span></div>
+    <div class="legend"><span class="legend-item"><span class="legend-dot brown"></span>Yap\u0131 Ruhsatl\u0131</span><span class="legend-item"><span class="legend-dot yellow"></span>\u0130marl\u0131 / Yap\u0131 Fark\u0131</span><span class="legend-item"><span class="legend-dot red"></span>Ka\u00e7ak Yap\u0131</span></div>
   </div>
   <div id="map"></div>
   <div id="cpopup"></div>
@@ -262,6 +292,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     map.fitBounds(defaultBounds);
     map.setMaxBounds(defaultBounds.pad(0.08));
     const markerPalette = {{
+      yapi_ruhsatli: {{ fill: '#8b5a2b', stroke: '#3f2a14' }},
       kacak_yapi: {{ fill: '#ff2d2d', stroke: '#2b2f34' }},
       yapi_farki: {{ fill: '#f4c430', stroke: '#6c5400' }}
     }};
@@ -409,5 +440,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

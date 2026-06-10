@@ -1,4 +1,4 @@
-﻿# Gursu Yapi Degisim Tespiti
+# Gursu Yapi Degisim Tespiti
 
 Gursu ilcesi icin Esri World Imagery Wayback kaynakli 512x512 uydu goruntusu indirme, 2021-2026 yeni yapi adayi tespiti ve harita uzerinde inceleme projesi.
 
@@ -14,6 +14,8 @@ Gursu ilcesi icin Esri World Imagery Wayback kaynakli 512x512 uydu goruntusu ind
 ## GitHub Icerigi
 
 - index.html: Harita ve popup arayuzu
+- data/imarsiz-gursu.geojson: Imarsiz/plansiz alan poligonlari
+- data/ruhsatli-yapi-parseller-gursu.geojson: Yapi ruhsati bulunan parseller
 - results/gursu_change_verified_segmentation_2021_2026.jsonl: Nokta ve koordinat kayitlari
 - results/masks_segmentation_verified_2021_2026/: Popup icin before / after / detected uclu gorseller
 - build_gursu_html.py: JSONL sonuclarindan haritayi yeniden uretir
@@ -28,9 +30,10 @@ Gursu ilcesi icin Esri World Imagery Wayback kaynakli 512x512 uydu goruntusu ind
 
 ## Imar Siniflandirmasi
 
-Haritadaki tespit noktalarinin siniflandirilmasi `data/imarsiz-gursu.geojson` kaynagina gore yapilir.
+Haritadaki tespit noktalari `data/ruhsatli-yapi-parseller-gursu.geojson` ve `data/imarsiz-gursu.geojson` kaynaklarina gore siniflandirilir. Oncelik sirasi ruhsatli parsel, imarsiz/plansiz alan, ardindan yapi farki seklindedir.
 
-- Kacak Yapi: Tespit noktasi imarsiz/plansiz alan poligonu icindedir ve haritada kirmizi nokta ile gosterilir.
-- Yapi Farki: Tespit noktasi imarsiz alan disindadir ve haritada sari nokta ile gosterilir.
+- Yapi Ruhsatli: Tespit noktasi yapi ruhsati bulunan parsel icindedir ve haritada kahverengi nokta ile gosterilir.
+- Kacak Yapi: Tespit noktasi ruhsatli parsel disinda, imarsiz/plansiz alan poligonu icindedir ve haritada kirmizi nokta ile gosterilir.
+- Yapi Farki: Tespit noktasi ruhsatli veya imarsiz alana denk gelmez; imarli/yapi farki olarak haritada sari nokta ile gosterilir.
 
-`maks-ruhsat.json` ruhsat kayitlarini MAKS `kimlik_no` ile tutar; bu dosyanin dogrudan koordinati yoktur. Ruhsat-kimlik bazli kesin eslestirme icin MAKS yapi geometrisi veya yetkili CBS API erisimi gerekir.
+`maks-ruhsat.json` ruhsat kayitlarini MAKS `kimlik_no` ve ada/parsel bilgileriyle tutar; dosyada dogrudan koordinat yoktur. `data/ruhsatli-yapi-parseller-gursu.geojson`, yapi ruhsati kayitlarindaki ada/parsel bilgilerinin GeoServer `adaparselv1` parselleriyle eslestirilmesiyle uretilmistir.

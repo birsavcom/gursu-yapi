@@ -414,10 +414,23 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
       return Number(period.display_year || period.year_to || 0);
     }}
 
+    function dataDisplayYears() {{
+      return Array.from(new Set(periodOptions.map(periodDisplayYear).filter(Boolean))).sort(function(a, b) {{ return a - b; }});
+    }}
+
+    function toYearOptions() {{
+      const dataYears = dataDisplayYears();
+      const startYear = dataYears.length ? Math.min.apply(null, dataYears) : 2026;
+      const endYear = Math.max(calendarYear, dataYears.length ? Math.max.apply(null, dataYears) : startYear);
+      const years = [];
+      for (let year = startYear; year <= endYear; year += 1) years.push(year);
+      return years;
+    }}
+
     function pickActiveDisplayYear() {{
-      const years = Array.from(new Set(periodOptions.map(periodDisplayYear).filter(Boolean))).sort(function(a, b) {{ return a - b; }});
-      if (years.includes(calendarYear)) return calendarYear;
-      return years.length ? years[years.length - 1] : calendarYear;
+      const dataYears = dataDisplayYears();
+      if (dataYears.includes(calendarYear)) return calendarYear;
+      return dataYears.length ? dataYears[dataYears.length - 1] : calendarYear;
     }}
 
     function visiblePeriodOptions() {{
@@ -431,14 +444,20 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
     function refreshYearSelects() {{
       const periods = visiblePeriodOptions();
       const fromYear = periods.length ? Math.min.apply(null, periods.map(function(period) {{ return Number(period.year_from || 2021); }})) : 2021;
-      const toYear = periods.length ? activeDisplayYear : 2026;
       fillSelect(fromSelect, [fromYear], fromYear);
-      fillSelect(toSelect, [toYear], toYear);
+      fillSelect(toSelect, toYearOptions(), activeDisplayYear);
     }}
 
     function fillPeriodSelect() {{
       periodSelect.innerHTML = '';
       const visiblePeriods = visiblePeriodOptions();
+      if (!visiblePeriods.length) {{
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'Tespit yok';
+        periodSelect.appendChild(emptyOption);
+        return;
+      }}
       if (visiblePeriods.length > 1) {{
         const allOption = document.createElement('option');
         allOption.value = 'all';
@@ -453,6 +472,7 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
       }});
       if (visiblePeriods.length === 1) periodSelect.value = visiblePeriods[0].id;
     }}
+
 
     function allFeatures() {{
       return Object.values(yearDatasets).reduce(function(items, current) {{
@@ -585,7 +605,12 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
       normalizeYearSelection();
       renderMarkers();
     }});
-    toSelect.addEventListener('change', renderMarkers);
+    toSelect.addEventListener('change', function() {{
+      activeDisplayYear = Number(toSelect.value);
+      refreshYearSelects();
+      fillPeriodSelect();
+      renderMarkers();
+    }});
     periodSelect.addEventListener('change', renderMarkers);
     renderMarkers();
     map.on('click', hidePopup);

@@ -1,8 +1,8 @@
 {
-  "enabled": false,
+  "enabled": true,
   "first_run_at": "2026-08-01T03:00:00+03:00",
   "interval": "monthly",
-  "mode": "incremental",
+  "mode": "incremental_with_annual_rollup",
   "district": "gursu",
   "bbox": {
     "min_lon": 29.131191,
@@ -17,10 +17,21 @@
   },
   "initial_inventory": {
     "id": "initial_2021_2026",
-    "label": "2021-2026 Ilk Tespit",
+    "label": "2021-2026 İlk Tespit",
     "from_year": 2021,
     "to_year": 2026,
     "locked": true
+  },
+  "automation_policy": {
+    "active_filter_year": "current_year_with_fallback_to_latest_available",
+    "show_monthly_periods_for_to_year_only": true,
+    "create_annual_rollup_on_new_year": true,
+    "annual_baseline_year": 2021,
+    "annual_label_format": "{baseline_year}-{target_year} Genel Tespit",
+    "first_monthly_period": {
+      "from": "2026-07",
+      "to": "2026-08"
+    }
   },
   "incremental": {
     "first_compare_from": "2026-07",
@@ -30,13 +41,25 @@
     "cleanup_temp_dataset_after_success": true,
     "keep_latest_reference_dataset": true
   },
+  "pipeline": {
+    "python": "python",
+    "download_script": "download_gursu_wayback.py",
+    "detection_script": "gursu_change_detection.py",
+    "detection_mode": "segment-full",
+    "workers": 1,
+    "download_workers": 8,
+    "image_format": "png",
+    "timeout": 30,
+    "release_strategy": "latest_on_or_before_month_end",
+    "require_newer_release": true
+  },
   "paths": {
     "baseline_dataset": "dataset/baseline/2021",
     "reference_cache": "dataset/cache/current_reference",
-    "temporary_dataset": "dataset/temp",
+    "temporary_dataset": "dataset/automation",
     "monthly_detections": "data/monthly_detections.json",
+    "state": "automation/state.json",
     "results_root": "results",
     "logs_root": "logs/automation"
   }
 }
-

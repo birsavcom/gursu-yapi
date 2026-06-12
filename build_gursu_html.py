@@ -37,6 +37,7 @@ RUNS = [
         "period_id": "initial_2021_2026",
         "period_label": "2021-2026 \u0130lk Tespit",
         "period_type": "initial",
+        "display_year": 2026,
     },
 ]
 
@@ -126,6 +127,14 @@ def is_in_polygon_index(lon: float, lat: float, polygon_index: list) -> bool:
     return False
 
 
+def run_interval_text(run: dict) -> str:
+    from_label = run.get("from_period_label")
+    to_label = run.get("to_period_label")
+    if from_label and to_label:
+        return f"{from_label} döneminde görünmeyip {to_label} döneminde görünen"
+    return f"{run['year_from']} yılında görünmeyip {run['year_to']} yılında görünen"
+
+
 def detection_classification(
     lon: float,
     lat: float,
@@ -133,41 +142,33 @@ def detection_classification(
     imarsiz_index: list,
     ruhsatli_index: list,
 ) -> dict:
+    interval_text = run_interval_text(run)
     if is_in_polygon_index(lon, lat, ruhsatli_index):
         return {
             "category": "yapi_ruhsatli",
-            "title": "Yap\u0131 Ruhsatl\u0131",
-            "status": "Yap\u0131 ruhsatl\u0131",
-            "description": (
-                f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
-                f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen yap\u0131 ruhsatl\u0131 yap\u0131"
-            ),
-            "imar_status": "Yap\u0131 ruhsatl\u0131",
+            "title": "Yapı Ruhsatlı",
+            "status": "Yapı ruhsatlı",
+            "description": f"{interval_text} yapı ruhsatlı yapı",
+            "imar_status": "Yapı ruhsatlı",
             "accent_color": "#8b5a2b",
             "accent_text_color": "#ffffff",
         }
     if is_in_polygon_index(lon, lat, imarsiz_index):
         return {
             "category": "kacak_yapi",
-            "title": "Ka\u00e7ak Yap\u0131",
-            "status": "Ka\u00e7ak yap\u0131 aday\u0131",
-            "description": (
-                f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
-                f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen ka\u00e7ak yap\u0131 aday\u0131"
-            ),
-            "imar_status": "\u0130mars\u0131z alan",
+            "title": "Kaçak Yapı",
+            "status": "Kaçak yapı adayı",
+            "description": f"{interval_text} kaçak yapı adayı",
+            "imar_status": "İmarsız alan",
             "accent_color": "#ff2d2d",
             "accent_text_color": "#ffffff",
         }
     return {
         "category": "yapi_farki",
-        "title": "\u0130marl\u0131",
-        "status": "\u0130marl\u0131 yap\u0131 fark\u0131",
-        "description": (
-            f"{run['year_from']} y\u0131l\u0131nda g\u00f6r\u00fcnmeyip "
-            f"{run['year_to']} y\u0131l\u0131nda g\u00f6r\u00fcnen fark yap\u0131"
-        ),
-        "imar_status": "\u0130marl\u0131 alan",
+        "title": "İmarlı",
+        "status": "İmarlı yapı farkı",
+        "description": f"{interval_text} fark yapı",
+        "imar_status": "İmarlı alan",
         "accent_color": "#f4c430",
         "accent_text_color": "#111111",
     }
@@ -216,6 +217,9 @@ def read_detections_for_run(run: dict) -> list[dict]:
                 "period_id": run.get("period_id", key),
                 "period_label": run.get("period_label", f"{run['year_from']}-{run['year_to']} K\u0131yaslamas\u0131"),
                 "period_type": run.get("period_type", "initial"),
+                "display_year": run.get("display_year", run["year_to"]),
+                "from_period": run.get("from_period"),
+                "to_period": run.get("to_period"),
                 **classification,
             }
         )
@@ -239,6 +243,11 @@ def normalize_monthly_item(item: dict, run: dict) -> dict:
     normalized.setdefault("period_label", run["label"])
     normalized.setdefault("period_type", run.get("type", "monthly"))
     normalized.setdefault("date_label", run["label"])
+    normalized.setdefault("display_year", run.get("display_year") or run.get("year_to"))
+    normalized.setdefault("year_from", run.get("year_from"))
+    normalized.setdefault("year_to", run.get("year_to"))
+    normalized.setdefault("from_period", run.get("from_period"))
+    normalized.setdefault("to_period", run.get("to_period"))
     return normalized
 
 
@@ -265,6 +274,11 @@ def build_period_options(year_datasets: dict[str, list[dict]]) -> list[dict]:
             "id": period_id,
             "label": run.get("period_label", f"{run['year_from']}-{run['year_to']}"),
             "type": run.get("period_type", "initial"),
+            "year_from": run.get("year_from"),
+            "year_to": run.get("year_to"),
+            "display_year": run.get("display_year", run.get("year_to")),
+            "from_period": run.get("from_period"),
+            "to_period": run.get("to_period"),
         })
     for run in load_monthly_runs():
         run_id = run.get("id")
@@ -275,6 +289,11 @@ def build_period_options(year_datasets: dict[str, list[dict]]) -> list[dict]:
             "id": run_id,
             "label": run.get("label", run_id),
             "type": run.get("type", "monthly"),
+            "year_from": run.get("year_from"),
+            "year_to": run.get("year_to"),
+            "display_year": run.get("display_year") or run.get("year_to"),
+            "from_period": run.get("from_period"),
+            "to_period": run.get("to_period"),
         })
     return [period for period in periods if any(
         item.get("period_id") == period["id"] for items in year_datasets.values() for item in items
@@ -355,8 +374,8 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
     const yearDatasets = {datasets_json};
     const periodOptions = {periods_json};
     const runs = {runs_json};
-    const fromYears = [2021];
-    const toYears = [2026];
+    const calendarYear = new Date().getFullYear();
+    let activeDisplayYear = pickActiveDisplayYear();
     const map = L.map('map', {{ zoomControl: true, attributionControl: false, dragging: true, touchZoom: true, doubleClickZoom: true, scrollWheelZoom: true, boxZoom: false, keyboard: false, zoomSnap: 0.5 }});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}').addTo(map);
     const defaultBounds = L.latLngBounds([boundsInfo.south, boundsInfo.west], [boundsInfo.north, boundsInfo.east]);
@@ -391,21 +410,48 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
       }});
     }}
 
+    function periodDisplayYear(period) {{
+      return Number(period.display_year || period.year_to || 0);
+    }}
+
+    function pickActiveDisplayYear() {{
+      const years = Array.from(new Set(periodOptions.map(periodDisplayYear).filter(Boolean))).sort(function(a, b) {{ return a - b; }});
+      if (years.includes(calendarYear)) return calendarYear;
+      return years.length ? years[years.length - 1] : calendarYear;
+    }}
+
+    function visiblePeriodOptions() {{
+      return periodOptions.filter(function(period) {{ return periodDisplayYear(period) === activeDisplayYear; }});
+    }}
+
+    function visiblePeriodIds() {{
+      return new Set(visiblePeriodOptions().map(function(period) {{ return period.id; }}));
+    }}
+
+    function refreshYearSelects() {{
+      const periods = visiblePeriodOptions();
+      const fromYear = periods.length ? Math.min.apply(null, periods.map(function(period) {{ return Number(period.year_from || 2021); }})) : 2021;
+      const toYear = periods.length ? activeDisplayYear : 2026;
+      fillSelect(fromSelect, [fromYear], fromYear);
+      fillSelect(toSelect, [toYear], toYear);
+    }}
+
     function fillPeriodSelect() {{
       periodSelect.innerHTML = '';
-      if (periodOptions.length > 1) {{
+      const visiblePeriods = visiblePeriodOptions();
+      if (visiblePeriods.length > 1) {{
         const allOption = document.createElement('option');
         allOption.value = 'all';
-        allOption.textContent = 'T\u00fcm Tespitler';
+        allOption.textContent = 'Tüm Tespitler';
         periodSelect.appendChild(allOption);
       }}
-      periodOptions.forEach(function(period) {{
+      visiblePeriods.forEach(function(period) {{
         const option = document.createElement('option');
         option.value = period.id;
         option.textContent = period.label;
         periodSelect.appendChild(option);
       }});
-      if (periodOptions.length === 1) periodSelect.value = periodOptions[0].id;
+      if (visiblePeriods.length === 1) periodSelect.value = visiblePeriods[0].id;
     }}
 
     function allFeatures() {{
@@ -413,6 +459,7 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
         return items.concat(current);
       }}, []);
     }}
+
 
     function makePopupHTML(item) {{
       return '<button class="cpopup-close" onclick="hidePopup()">&times;</button>'
@@ -496,10 +543,12 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
 
     function selectedFeatures() {{
       const periodId = periodSelect.value;
-      const features = allFeatures();
+      const allowedPeriodIds = visiblePeriodIds();
+      const features = allFeatures().filter(function(item) {{ return allowedPeriodIds.has(item.period_id); }});
       if (!periodId || periodId === 'all') return features;
       return features.filter(function(item) {{ return item.period_id === periodId; }});
     }}
+
 
     function renderMarkers() {{
       hidePopup();
@@ -526,12 +575,10 @@ def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict])
     }}
 
     function normalizeYearSelection() {{
-      const fromYear = Number(fromSelect.value);
-      const validToYears = toYears.filter(function(year) {{ return year > fromYear; }});
-      fillSelect(toSelect, validToYears, Math.max(...validToYears));
+      refreshYearSelects();
     }}
 
-    fillSelect(fromSelect, fromYears, 2021);
+
     normalizeYearSelection();
     fillPeriodSelect();
     fromSelect.addEventListener('change', function() {{

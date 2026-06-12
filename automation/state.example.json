@@ -1,7 +1,12 @@
 {
   "last_successful_run_id": null,
-  "last_processed_period": null,
+  "last_processed_period": {
+    "from": "2026-07",
+    "to": "2026-08",
+    "release_date": null,
+    "release_id": null
+  },
   "last_processed_esri_snapshot": null,
-  "last_reference_dataset": null,
-  "notes": "Copy this file to automation/state.json on the server if persistent automation state is needed."
+  "last_reference_dataset": "dataset/automation/2026-08",
+  "notes": "Copy this file to automation/state.json on the server only if you need to seed persistent automation state. Normally the script creates state.json after the first successful run."
 }

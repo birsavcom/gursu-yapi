@@ -1,9 +1,16 @@
-﻿import argparse
+import argparse
 import os
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
+
+def _resolve_dataset_path(value: str | None, fallback_year: int) -> Path:
+    if value:
+        path = Path(value)
+        return path if path.is_absolute() else PROJECT_ROOT / path
+    return PROJECT_ROOT / "dataset" / str(fallback_year)
 
 
 def build_parser():
@@ -62,6 +69,16 @@ def build_parser():
         help="After/target imagery year.",
     )
     parser.add_argument(
+        "--old-dataset",
+        default=None,
+        help="Optional explicit before/source dataset directory.",
+    )
+    parser.add_argument(
+        "--new-dataset",
+        default=None,
+        help="Optional explicit after/target dataset directory.",
+    )
+    parser.add_argument(
         "--run-tag",
         default=None,
         help="Optional output suffix. Defaults to YEAR_FROM_YEAR_TO.",
@@ -69,16 +86,28 @@ def build_parser():
     return parser
 
 
-def apply_gursu_environment(year_from: int, year_to: int, run_tag: str | None):
+def apply_gursu_environment(
+    year_from: int,
+    year_to: int,
+    run_tag: str | None,
+    old_dataset: str | None = None,
+    new_dataset: str | None = None,
+):
     os.environ["CHANGE_PROJECT_PREFIX"] = "gursu"
-    os.environ["GURSU_OLD_DATASET"] = str(PROJECT_ROOT / "dataset" / str(year_from))
-    os.environ["GURSU_NEW_DATASET"] = str(PROJECT_ROOT / "dataset" / str(year_to))
+    os.environ["GURSU_OLD_DATASET"] = str(_resolve_dataset_path(old_dataset, year_from))
+    os.environ["GURSU_NEW_DATASET"] = str(_resolve_dataset_path(new_dataset, year_to))
     os.environ["GURSU_RUN_TAG"] = run_tag or f"{year_from}_{year_to}"
 
 
 def main():
     args = build_parser().parse_args()
-    apply_gursu_environment(args.year_from, args.year_to, args.run_tag)
+    apply_gursu_environment(
+        args.year_from,
+        args.year_to,
+        args.run_tag,
+        old_dataset=args.old_dataset,
+        new_dataset=args.new_dataset,
+    )
 
     if args.mode == "detect-full":
         from src.full.analyzer_cleaner_detection import main as run
@@ -133,5 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

@@ -40,12 +40,14 @@ Haritadaki tespit noktalari `data/ruhsatli-yapi-parseller-gursu.geojson` ve `dat
 
 ## Aylik Otomasyon
 
-Aylik guncelleme altyapisi `automation/` altinda pasif olarak hazirlanmistir. Mevcut 2021-2026 harita sonucunu, tespit noktalarini ve popup gorsellerini degistirmez.
+Aylik guncelleme altyapisi `automation/` altinda hazirlanmistir. Mevcut 2021-2026 harita sonucu, tespit noktalari ve popup gorselleri korunur; yeni otomasyon ancak planlanan tarihten sonra yeni Esri goruntusu bulursa ek tespit uretir.
 
 - Planlanan ilk otomasyon tarihi: 2026-08-01 03:00 Europe/Istanbul
-- Mevcut durum: `automation/config.json` icinde `enabled: false`
-- Aylik tespitler ileride `data/monthly_detections.json` dosyasina eklenecek
-- Harita filtresi mevcut ilk tespiti ve ileride eklenecek aylik donemleri dinamik olarak gosterecek
-- Sunucu timer dosyalari `automation/systemd/` altinda taslak olarak bulunur; kurulmadikca otomatik calisma baslamaz
+- Mevcut durum: `automation/config.json` icinde `enabled: true`; script bu tarihten once `waiting` doner
+- Ilk aylik karsilastirma: Temmuz 2026 -> Agustos 2026
+- Aylik tespitler `data/monthly_detections.json` dosyasina eklenir
+- Her yeni yilda, ilk ilgili ay islenirken 2021 -> guncel yil genel tespiti uretilir; ornegin 2027 icin `2021-2027 Genel Tespit`
+- Harita filtresi aktif/guncel yilin donemlerini gosterir; eski yillara ait aylik donemler JSON icinde sakli kalir ama yeni yila gecildiginde aktif filtrede listelenmez
+- Sunucu timer dosyalari `automation/systemd/` altinda taslak olarak bulunur; repodaki dosyalar tek basina timer kurmaz
 
-Devreye alma gunu `enabled` degeri `true` yapilip server timer kurulmadan otomasyon calismaz.
+Sunucuda devreye alma sirasinda timer kurulursa otomasyon ayda bir calisir; GitHub'a dataset eklenmez.

@@ -1,0 +1,42 @@
+{
+  "enabled": false,
+  "first_run_at": "2026-08-01T03:00:00+03:00",
+  "interval": "monthly",
+  "mode": "incremental",
+  "district": "gursu",
+  "bbox": {
+    "min_lon": 29.131191,
+    "min_lat": 40.198367,
+    "max_lon": 29.306497,
+    "max_lat": 40.339645
+  },
+  "imagery": {
+    "provider": "esri_world_imagery_wayback",
+    "zoom": 18,
+    "tile_size": 512
+  },
+  "initial_inventory": {
+    "id": "initial_2021_2026",
+    "label": "2021-2026 Ilk Tespit",
+    "from_year": 2021,
+    "to_year": 2026,
+    "locked": true
+  },
+  "incremental": {
+    "first_compare_from": "2026-07",
+    "first_compare_to": "2026-08",
+    "period_label_format": "{from_month_name} {from_year} - {to_month_name} {to_year}",
+    "dedupe_distance_meters": 12,
+    "cleanup_temp_dataset_after_success": true,
+    "keep_latest_reference_dataset": true
+  },
+  "paths": {
+    "baseline_dataset": "dataset/baseline/2021",
+    "reference_cache": "dataset/cache/current_reference",
+    "temporary_dataset": "dataset/temp",
+    "monthly_detections": "data/monthly_detections.json",
+    "results_root": "results",
+    "logs_root": "logs/automation"
+  }
+}
+

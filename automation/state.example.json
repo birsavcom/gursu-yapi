@@ -1,0 +1,7 @@
+{
+  "last_successful_run_id": null,
+  "last_processed_period": null,
+  "last_processed_esri_snapshot": null,
+  "last_reference_dataset": null,
+  "notes": "Copy this file to automation/state.json on the server if persistent automation state is needed."
+}

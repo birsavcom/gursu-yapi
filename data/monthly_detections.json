@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "district": "gursu",
+  "description": "Monthly incremental detections are appended here after automation runs. Empty by default so the current 2021-2026 map stays unchanged.",
+  "runs": []
+}

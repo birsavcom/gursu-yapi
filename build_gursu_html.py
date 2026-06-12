@@ -19,7 +19,8 @@ OUT_PATH = ROOT / "index.html"
 DATA = ROOT / "data"
 IMARSIZ_GEOJSON = DATA / "imarsiz-gursu.geojson"
 RUHSATLI_GEOJSON = DATA / "ruhsatli-yapi-parseller-gursu.geojson"
-CACHE_TOKEN = "20260608c"
+MONTHLY_DETECTIONS = DATA / "monthly_detections.json"
+CACHE_TOKEN = "20260612a"
 
 BOUNDS = {
     "west": 29.131191,
@@ -29,7 +30,14 @@ BOUNDS = {
 }
 
 RUNS = [
-    {"key": "2021_2026", "year_from": 2021, "year_to": 2026},
+    {
+        "key": "2021_2026",
+        "year_from": 2021,
+        "year_to": 2026,
+        "period_id": "initial_2021_2026",
+        "period_label": "2021-2026 \u0130lk Tespit",
+        "period_type": "initial",
+    },
 ]
 
 
@@ -202,22 +210,81 @@ def read_detections_for_run(run: dict) -> list[dict]:
                 "merged_triplet_rel": (
                     f"results/masks_segmentation_verified_{key}/pair_{pair_id}.jpg?v={CACHE_TOKEN}"
                 ),
-                "date_label": f"{run['year_from']}-{run['year_to']} K\u0131yaslamas\u0131",
+                "date_label": run.get("period_label") or f"{run['year_from']}-{run['year_to']} K\u0131yaslamas\u0131",
                 "year_from": run["year_from"],
                 "year_to": run["year_to"],
+                "period_id": run.get("period_id", key),
+                "period_label": run.get("period_label", f"{run['year_from']}-{run['year_to']} K\u0131yaslamas\u0131"),
+                "period_type": run.get("period_type", "initial"),
                 **classification,
             }
         )
     return detections
 
 
+def _read_json(path: Path, default):
+    if not path.exists():
+        return default
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def load_monthly_runs() -> list[dict]:
+    payload = _read_json(MONTHLY_DETECTIONS, {"runs": []})
+    return payload.get("runs", []) if isinstance(payload, dict) else []
+
+
+def normalize_monthly_item(item: dict, run: dict) -> dict:
+    normalized = dict(item)
+    normalized.setdefault("period_id", run["id"])
+    normalized.setdefault("period_label", run["label"])
+    normalized.setdefault("period_type", run.get("type", "monthly"))
+    normalized.setdefault("date_label", run["label"])
+    return normalized
+
+
 def build_year_datasets() -> dict[str, list[dict]]:
-    return {run["key"]: read_detections_for_run(run) for run in RUNS}
+    datasets = {run["key"]: read_detections_for_run(run) for run in RUNS}
+    for run in load_monthly_runs():
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        items = run.get("items", [])
+        datasets[run_id] = [normalize_monthly_item(item, run) for item in items]
+    return datasets
 
 
-def build_html(year_datasets: dict[str, list[dict]]) -> str:
+def build_period_options(year_datasets: dict[str, list[dict]]) -> list[dict]:
+    periods = []
+    seen = set()
+    for run in RUNS:
+        period_id = run.get("period_id", run["key"])
+        if period_id in seen:
+            continue
+        seen.add(period_id)
+        periods.append({
+            "id": period_id,
+            "label": run.get("period_label", f"{run['year_from']}-{run['year_to']}"),
+            "type": run.get("period_type", "initial"),
+        })
+    for run in load_monthly_runs():
+        run_id = run.get("id")
+        if not run_id or run_id in seen:
+            continue
+        seen.add(run_id)
+        periods.append({
+            "id": run_id,
+            "label": run.get("label", run_id),
+            "type": run.get("type", "monthly"),
+        })
+    return [period for period in periods if any(
+        item.get("period_id") == period["id"] for items in year_datasets.values() for item in items
+    )]
+
+
+def build_html(year_datasets: dict[str, list[dict]], period_options: list[dict]) -> str:
     bounds_json = json.dumps(BOUNDS, ensure_ascii=False)
     datasets_json = json.dumps(year_datasets, ensure_ascii=False)
+    periods_json = json.dumps(period_options, ensure_ascii=False)
     runs_json = json.dumps(RUNS, ensure_ascii=False)
 
     return f"""<!doctype html>
@@ -258,11 +325,12 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     .legend-dot.red {{ background: #ff2d2d; }}
     .legend-dot.yellow {{ background: #f4c430; }}
     .legend-dot.brown {{ background: #8b5a2b; }}
-    .map-panel {{ position: fixed; z-index: 999; top: 14px; left: 14px; background: rgba(10,20,30,0.90); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); min-width: 278px; }}
+    .map-panel {{ position: fixed; z-index: 999; top: 14px; left: 14px; background: rgba(10,20,30,0.90); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); min-width: 330px; max-width: calc(100vw - 28px); }}
     .panel-title {{ font-weight: 700; margin-bottom: 8px; }}
     .controls {{ display: flex; align-items: center; gap: 8px; }}
     .controls label {{ color: #c8d0d7; }}
     .year-select {{ background: #1f2933; color: #fff; border: 1px solid #405161; border-radius: 6px; padding: 5px 7px; }}
+    .period-select {{ min-width: 178px; }}
     .leaflet-top.leaflet-left {{ top: 110px; }}
   </style>
 </head>
@@ -274,6 +342,8 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
       <select class="year-select" id="fromYear"></select>
       <label for="toYear">Biti\u015f</label>
       <select class="year-select" id="toYear"></select>
+      <label for="periodSelect">Tespit D\u00f6nemi</label>
+      <select class="year-select period-select" id="periodSelect"></select>
     </div>
     <div class="legend"><span class="legend-item"><span class="legend-dot brown"></span>Yap\u0131 Ruhsatl\u0131</span><span class="legend-item"><span class="legend-dot yellow"></span>\u0130marl\u0131 / Yap\u0131 Fark\u0131</span><span class="legend-item"><span class="legend-dot red"></span>Ka\u00e7ak Yap\u0131</span></div>
   </div>
@@ -283,6 +353,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
   <script>
     const boundsInfo = {bounds_json};
     const yearDatasets = {datasets_json};
+    const periodOptions = {periods_json};
     const runs = {runs_json};
     const fromYears = [2021];
     const toYears = [2026];
@@ -307,6 +378,7 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     const cpopup = document.getElementById('cpopup');
     const fromSelect = document.getElementById('fromYear');
     const toSelect = document.getElementById('toYear');
+    const periodSelect = document.getElementById('periodSelect');
 
     function fillSelect(select, years, selected) {{
       select.innerHTML = '';
@@ -317,6 +389,29 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
         if (year === selected) option.selected = true;
         select.appendChild(option);
       }});
+    }}
+
+    function fillPeriodSelect() {{
+      periodSelect.innerHTML = '';
+      if (periodOptions.length > 1) {{
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = 'T\u00fcm Tespitler';
+        periodSelect.appendChild(allOption);
+      }}
+      periodOptions.forEach(function(period) {{
+        const option = document.createElement('option');
+        option.value = period.id;
+        option.textContent = period.label;
+        periodSelect.appendChild(option);
+      }});
+      if (periodOptions.length === 1) periodSelect.value = periodOptions[0].id;
+    }}
+
+    function allFeatures() {{
+      return Object.values(yearDatasets).reduce(function(items, current) {{
+        return items.concat(current);
+      }}, []);
     }}
 
     function makePopupHTML(item) {{
@@ -400,10 +495,10 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
     }};
 
     function selectedFeatures() {{
-      const fromYear = Number(fromSelect.value);
-      const toYear = Number(toSelect.value);
-      const key = fromYear + '_' + toYear;
-      return yearDatasets[key] || [];
+      const periodId = periodSelect.value;
+      const features = allFeatures();
+      if (!periodId || periodId === 'all') return features;
+      return features.filter(function(item) {{ return item.period_id === periodId; }});
     }}
 
     function renderMarkers() {{
@@ -438,11 +533,13 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 
     fillSelect(fromSelect, fromYears, 2021);
     normalizeYearSelection();
+    fillPeriodSelect();
     fromSelect.addEventListener('change', function() {{
       normalizeYearSelection();
       renderMarkers();
     }});
     toSelect.addEventListener('change', renderMarkers);
+    periodSelect.addEventListener('change', renderMarkers);
     renderMarkers();
     map.on('click', hidePopup);
   </script>
@@ -452,7 +549,8 @@ def build_html(year_datasets: dict[str, list[dict]]) -> str:
 
 def main() -> None:
     year_datasets = build_year_datasets()
-    OUT_PATH.write_text(build_html(year_datasets), encoding="utf-8")
+    period_options = build_period_options(year_datasets)
+    OUT_PATH.write_text(build_html(year_datasets, period_options), encoding="utf-8")
     summary = {
         key: {
             "total": len(value),

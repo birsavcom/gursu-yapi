@@ -1,0 +1,11 @@
+[Unit]
+Description=Gursu monthly building-change update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/var/www/gursu-yapi
+ExecStart=/usr/bin/python3 automation/monthly_update.py --config automation/config.json
+User=www-data
+Group=www-data

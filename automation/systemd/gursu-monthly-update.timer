@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Gursu monthly building-change update
+
+[Timer]
+OnCalendar=*-*-01 03:00:00
+Persistent=true
+Unit=gursu-monthly-update.service
+
+[Install]
+WantedBy=timers.target

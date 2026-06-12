@@ -1,4 +1,4 @@
-﻿dataset/
+dataset/
 logs/
 models/*.pt
 
@@ -23,3 +23,5 @@ results/pairs_segmentation_all_*/
 venv/
 Thumbs.db
 .DS_Store
+
+automation/state.json

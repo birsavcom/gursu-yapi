@@ -37,3 +37,15 @@ Haritadaki tespit noktalari `data/ruhsatli-yapi-parseller-gursu.geojson` ve `dat
 - Yapi Farki: Tespit noktasi ruhsatli veya imarsiz alana denk gelmez; imarli/yapi farki olarak haritada sari nokta ile gosterilir.
 
 `maks-ruhsat.json` ruhsat kayitlarini MAKS `kimlik_no` ve ada/parsel bilgileriyle tutar; dosyada dogrudan koordinat yoktur. `data/ruhsatli-yapi-parseller-gursu.geojson`, yapi ruhsati kayitlarindaki ada/parsel bilgilerinin GeoServer `adaparselv1` parselleriyle eslestirilmesiyle uretilmistir.
+
+## Aylik Otomasyon
+
+Aylik guncelleme altyapisi `automation/` altinda pasif olarak hazirlanmistir. Mevcut 2021-2026 harita sonucunu, tespit noktalarini ve popup gorsellerini degistirmez.
+
+- Planlanan ilk otomasyon tarihi: 2026-08-01 03:00 Europe/Istanbul
+- Mevcut durum: `automation/config.json` icinde `enabled: false`
+- Aylik tespitler ileride `data/monthly_detections.json` dosyasina eklenecek
+- Harita filtresi mevcut ilk tespiti ve ileride eklenecek aylik donemleri dinamik olarak gosterecek
+- Sunucu timer dosyalari `automation/systemd/` altinda taslak olarak bulunur; kurulmadikca otomatik calisma baslamaz
+
+Devreye alma gunu `enabled` degeri `true` yapilip server timer kurulmadan otomasyon calismaz.
